@@ -1,0 +1,67 @@
+:root {
+  --bg: #0f1220;
+  --panel: rgba(15, 18, 32, 0.72);
+  --text: #edf2ff;
+  --accent: #8b5cf6;
+  --accent-2: #f472b6;
+  --danger: #ef4444;
+  --good: #34d399;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at top, #1a1d2e 0%, var(--bg) 40%, #090b12 100%);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.hud {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(960px, calc(100vw - 28px));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: var(--panel);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+.title {
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d8d7ff;
+}
+
+#stats {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+#gameCanvas {
+  display: block;
+  width: min(960px, calc(100vw - 28px));
+  height: auto;
+  border: 2px solid rgba(167, 139, 250, 0.7);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(10, 12, 20, 0.9), rgba(18, 20, 30, 0.9));
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+}
