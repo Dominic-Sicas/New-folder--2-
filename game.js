@@ -3,20 +3,24 @@ const ctx = canvas.getContext('2d');
 const statsEl = document.getElementById('stats');
 
 const world = {
-  width: canvas.width,
-  height: canvas.height,
+  width: 30000,
+  height: 30000,
+};
+
+const camera = {
+  x: 0,
+  y: 0,
 };
 
 const keys = {};
-const mouse = { x: world.width / 2, y: world.height / 2 };
+const mouse = { x: 0, y: 0 };
 
 let lastTime = 0;
-let spawnTimer = 0;
 let gameTime = 0;
 
 const player = {
-  x: world.width / 2,
-  y: world.height / 2,
+  x: 0,
+  y: 0,
   radius: 16,
   speed: 220,
   health: 100,
@@ -34,22 +38,27 @@ const enemies = [];
 const drops = [];
 const particles = [];
 
+const waveState = {
+  current: 0,
+  phase: 'break',
+  breakTimer: 0,
+};
+
 // Creature data is stored as JavaScript objects.
-// Each object is a blueprint for a monster or boss.
-// Later, you can use these values to spawn enemies or draw sprite images.
+// This acts like a menu of enemy types for spawning waves.
 const creatureLibrary = {
   rhino: {
     name: 'Rhino',
     category: 'brute',
-    size: 'large', // placeholder: replace with actual scale or hitbox size
-    health: 120, // placeholder: set full health later
+    size: 'large',
+    health: 120,
     maxHealth: 120,
-    damage: 20, // placeholder: attack damage value
-    speed: 45, // placeholder: movement speed
-    image: 'assets/rhino.png', // placeholder: file path for the art asset
-    color: '#6109e58c', // placeholder: temporary colour for testing
+    damage: 20,
+    speed: 45,
+    image: 'assets/rhino.png',
+    color: '#6109e58c',
     behavior: 'charges toward the player',
-    notes: 'Use this as a tanky melee enemy placeholder.'
+    notes: 'Tanky melee placeholder.'
   },
 
   plankton: {
@@ -62,8 +71,8 @@ const creatureLibrary = {
     speed: 80,
     image: 'assets/plankton.png',
     color: '#1d713c',
-    behavior: 'fast, weak, and annoying',
-    notes: 'A light horde unit for early-game pressure.'
+    behavior: 'fast and weak',
+    notes: 'Early-game horde unit.'
   },
 
   platypus: {
@@ -76,8 +85,8 @@ const creatureLibrary = {
     speed: 60,
     image: 'assets/platypus.png',
     color: '#1d99ce',
-    behavior: 'shoots or throws attacks from a distance',
-    notes: 'Good example of a ranged enemy blueprint.'
+    behavior: 'kites from a distance',
+    notes: 'Ranged placeholder.'
   },
 
   dragon: {
@@ -90,8 +99,8 @@ const creatureLibrary = {
     speed: 50,
     image: 'assets/dragon.png',
     color: '#fc0000',
-    behavior: 'flies, breathes fire, and hits hard',
-    notes: 'This is the large boss-type placeholder.'
+    behavior: 'boss wave enemy',
+    notes: 'Boss placeholder.'
   },
 
   twoHeadedLeopardWithWings: {
@@ -104,8 +113,8 @@ const creatureLibrary = {
     speed: 70,
     image: 'assets/two-headed-leopard-wings.png',
     color: '#d6ec0c',
-    behavior: 'multi-attack aerial predator',
-    notes: 'A more complex creature with two heads and wings.'
+    behavior: 'flying predator',
+    notes: 'Elite placeholder.'
   },
 
   eldritchBeing: {
@@ -118,14 +127,10 @@ const creatureLibrary = {
     speed: 35,
     image: 'assets/eldritch-being.png',
     color: '#f40a83',
-    behavior: 'teleports, pulses, and corrupts the arena',
-    notes: 'Boss placeholder for a weird magical final enemy.'
+    behavior: 'final boss',
+    notes: 'Wave 10 boss placeholder.'
   }
 };
-
-// This makes the object library easier to inspect in the console.
-// You can type: console.log(creatureLibrary)
-// in the browser dev tools to see all the placeholder data.
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -135,35 +140,80 @@ function randomRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-function spawnEnemy() {
-  const side = Math.floor(Math.random() * 4);
+function getEnemyTypeForWave(waveNumber) {
+  const safeWave = Math.max(1, waveNumber);
 
-  let x = 0;
-  let y = 0;
-
-  if (side === 0) {
-    x = randomRange(-40, world.width + 40);
-    y = -40;
-  } else if (side === 1) {
-    x = world.width + 40;
-    y = randomRange(-40, world.height + 40);
-  } else if (side === 2) {
-    x = randomRange(-40, world.width + 40);
-    y = world.height + 40;
-  } else {
-    x = -40;
-    y = randomRange(-40, world.height + 40);
+  if (safeWave === 10) {
+    return 'eldritchBeing';
   }
 
-  enemies.push({
-    x,
-    y,
-    radius: 12 + Math.random() * 8,
-    speed: 32 + Math.random() * 16,
-    health: 25 + player.level * 3,
-    maxHealth: 25 + player.level * 3,
-    damage: 10,
-  });
+  if (safeWave % 5 === 0) {
+    return 'dragon';
+  }
+
+  const pool = ['plankton', 'plankton', 'platypus', 'rhino'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function placeAroundPlayer(enemy, minDistance = 500, maxDistance = 900) {
+  const angle = Math.random() * Math.PI * 2;
+  const radius = randomRange(minDistance, maxDistance);
+
+  enemy.x = player.x + Math.cos(angle) * radius;
+  enemy.y = player.y + Math.sin(angle) * radius;
+}
+
+function createEnemyFromType(typeName, isBoss = false) {
+  const template = creatureLibrary[typeName];
+
+  const enemy = {
+    x: 0,
+    y: 0,
+    radius: isBoss ? 28 : 12 + Math.random() * 8,
+    speed: template.speed + randomRange(-12, 16),
+    health: template.health,
+    maxHealth: template.health,
+    damage: template.damage,
+    name: template.name,
+    color: template.color,
+    image: template.image,
+    boss: isBoss,
+  };
+
+  placeAroundPlayer(enemy, isBoss ? 650 : 420, isBoss ? 1100 : 780);
+  return enemy;
+}
+
+function beginNextWave() {
+  waveState.current += 1;
+  waveState.phase = 'battle';
+  waveState.breakTimer = 0;
+
+  enemies.length = 0;
+
+  const bossWave = waveState.current % 5 === 0;
+  const isFinalBossWave = waveState.current === 10;
+
+  if (isFinalBossWave) {
+    enemies.push(createEnemyFromType('eldritchBeing', true));
+    for (let i = 0; i < 4; i++) {
+      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+    }
+    return;
+  }
+
+  if (bossWave) {
+    enemies.push(createEnemyFromType('dragon', true));
+    for (let i = 0; i < 3; i++) {
+      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+    }
+    return;
+  }
+
+  const spawnCount = 6 + waveState.current * 2;
+  for (let i = 0; i < spawnCount; i++) {
+    enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+  }
 }
 
 function fireBullet() {
@@ -222,19 +272,32 @@ function gainXP(amount) {
 }
 
 function updateStats() {
-  statsEl.textContent = `Level ${player.level} | XP ${player.xp} / ${player.xpToNext} | HP ${Math.max(0, Math.ceil(player.health))}`;
+  if (waveState.phase === 'break') {
+    statsEl.textContent = `Wave ${waveState.current} | Break ${waveState.breakTimer.toFixed(1)}s | HP ${Math.max(0, Math.ceil(player.health))}`;
+    return;
+  }
+
+  statsEl.textContent = `Wave ${waveState.current} | Enemies ${enemies.length} | HP ${Math.max(0, Math.ceil(player.health))}`;
+}
+
+function updateCamera() {
+  camera.x = player.x - canvas.width / 2;
+  camera.y = player.y - canvas.height / 2;
 }
 
 function update(dt) {
   gameTime += dt;
-  spawnTimer -= dt;
   player.shotTimer -= dt;
 
-  if (spawnTimer <= 0) {
-    spawnEnemy();
-    spawnTimer = Math.max(0.5, 1.4 - player.level * 0.06);
+  if (waveState.phase === 'break') {
+    waveState.breakTimer -= dt;
+
+    if (waveState.breakTimer <= 0) {
+      beginNextWave();
+    }
   }
 
+  // The player can move forever because the world is much larger than the screen.
   const dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
   const dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
 
@@ -244,27 +307,20 @@ function update(dt) {
 
   player.x += moveX * dt;
   player.y += moveY * dt;
-  player.x = clamp(player.x, player.radius, world.width - player.radius);
-  player.y = clamp(player.y, player.radius, world.height - player.radius);
 
-  if (player.shotTimer <= 0) {
+  if (player.shotTimer <= 0 && waveState.phase === 'battle') {
     fireBullet();
     player.shotTimer = player.fireRate;
   }
 
+  // Update all bullets and enemy collisions.
   for (let i = bullets.length - 1; i >= 0; i--) {
     const bullet = bullets[i];
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
     bullet.life -= dt;
 
-    if (
-      bullet.life <= 0 ||
-      bullet.x < -20 ||
-      bullet.y < -20 ||
-      bullet.x > world.width + 20 ||
-      bullet.y > world.height + 20
-    ) {
+    if (bullet.life <= 0) {
       bullets.splice(i, 1);
       continue;
     }
@@ -272,17 +328,18 @@ function update(dt) {
     for (let j = enemies.length - 1; j >= 0; j--) {
       const enemy = enemies[j];
       const dist = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+
       if (dist < bullet.radius + enemy.radius) {
         enemy.health -= bullet.damage;
         bullets.splice(i, 1);
 
         if (enemy.health <= 0) {
           createParticles(enemy.x, enemy.y, '#ff6b6b', 16);
-          const xpAmount = 3 + player.level;
+          const xpAmount = enemy.boss ? 20 : 3 + player.level;
           drops.push({
             x: enemy.x,
             y: enemy.y,
-            radius: 6,
+            radius: enemy.boss ? 10 : 6,
             value: xpAmount,
             pulse: Math.random() * Math.PI * 2,
           });
@@ -294,31 +351,41 @@ function update(dt) {
     }
   }
 
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const enemy = enemies[i];
-    const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-    enemy.x += Math.cos(angle) * enemy.speed * dt;
-    enemy.y += Math.sin(angle) * enemy.speed * dt;
+  if (waveState.phase === 'battle') {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const enemy = enemies[i];
+      const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+      enemy.x += Math.cos(angle) * enemy.speed * dt;
+      enemy.y += Math.sin(angle) * enemy.speed * dt;
 
-    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (dist < player.radius + enemy.radius) {
-      player.health -= enemy.damage * dt;
-      createParticles(enemy.x, enemy.y, '#fca5a5', 4);
+      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+      if (dist < player.radius + enemy.radius) {
+        player.health -= enemy.damage * dt;
+        createParticles(enemy.x, enemy.y, '#fca5a5', 4);
+      }
+
+      if (player.health <= 0) {
+        player.health = player.maxHealth;
+        player.x = 0;
+        player.y = 0;
+        player.level = 1;
+        player.xp = 0;
+        player.xpToNext = 10;
+        player.damage = 15;
+        player.speed = 220;
+        enemies.length = 0;
+        drops.length = 0;
+        bullets.length = 0;
+        waveState.current = 0;
+        waveState.phase = 'break';
+        waveState.breakTimer = 5;
+        createParticles(player.x, player.y, '#7dd3fc', 30);
+      }
     }
 
-    if (player.health <= 0) {
-      player.health = player.maxHealth;
-      player.x = world.width / 2;
-      player.y = world.height / 2;
-      player.level = 1;
-      player.xp = 0;
-      player.xpToNext = 10;
-      player.damage = 15;
-      player.speed = 220;
-      enemies.length = 0;
-      drops.length = 0;
-      bullets.length = 0;
-      createParticles(player.x, player.y, '#7dd3fc', 30);
+    if (enemies.length === 0) {
+      waveState.phase = 'break';
+      waveState.breakTimer = 5;
     }
   }
 
@@ -338,30 +405,36 @@ function update(dt) {
     particle.x += particle.vx * dt;
     particle.y += particle.vy * dt;
     particle.life -= dt;
+
     if (particle.life <= 0) {
       particles.splice(i, 1);
     }
   }
 
+  updateCamera();
   updateStats();
 }
 
 function drawGrid() {
+  const gridSize = 64;
+  const startX = Math.floor(camera.x / gridSize) * gridSize;
+  const startY = Math.floor(camera.y / gridSize) * gridSize;
+
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.04)';
   ctx.lineWidth = 1;
 
-  for (let x = 0; x < world.width; x += 32) {
+  for (let x = startX; x < camera.x + canvas.width + gridSize; x += gridSize) {
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, world.height);
+    ctx.moveTo(x, camera.y);
+    ctx.lineTo(x, camera.y + canvas.height);
     ctx.stroke();
   }
 
-  for (let y = 0; y < world.height; y += 32) {
+  for (let y = startY; y < camera.y + canvas.height + gridSize; y += gridSize) {
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(world.width, y);
+    ctx.moveTo(camera.x, y);
+    ctx.lineTo(camera.x + canvas.width, y);
     ctx.stroke();
   }
 
@@ -397,7 +470,7 @@ function drawBullets() {
 
 function drawEnemies() {
   for (const enemy of enemies) {
-    ctx.fillStyle = '#ef4444';
+    ctx.fillStyle = enemy.color;
     ctx.beginPath();
     ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
     ctx.fill();
@@ -437,7 +510,7 @@ function drawParticles() {
 
 function drawHealthBar() {
   const barWidth = 150;
-  const x = world.width - barWidth - 20;
+  const x = canvas.width - barWidth - 20;
   const y = 20;
 
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -451,13 +524,18 @@ function drawHealthBar() {
 }
 
 function render() {
-  ctx.clearRect(0, 0, world.width, world.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
   drawGrid();
   drawDrops();
   drawBullets();
   drawEnemies();
   drawPlayer();
   drawParticles();
+  ctx.restore();
+
   drawHealthBar();
 }
 
@@ -482,8 +560,13 @@ canvas.addEventListener('mousemove', (event) => {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  mouse.x = (event.clientX - rect.left) * scaleX;
-  mouse.y = (event.clientY - rect.top) * scaleY;
+
+  const screenX = (event.clientX - rect.left) * scaleX;
+  const screenY = (event.clientY - rect.top) * scaleY;
+
+  mouse.x = camera.x + screenX;
+  mouse.y = camera.y + screenY;
 });
 
+beginNextWave();
 requestAnimationFrame(gameLoop);
