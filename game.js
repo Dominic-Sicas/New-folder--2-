@@ -54,7 +54,7 @@ const creatureLibrary = {
     health: 120,
     maxHealth: 120,
     damage: 20,
-    speed: 45,
+    speed: 72,
     image: 'assets/rhino.png',
     color: '#6109e58c',
     behavior: 'charges toward the player',
@@ -68,7 +68,7 @@ const creatureLibrary = {
     health: 30,
     maxHealth: 30,
     damage: 8,
-    speed: 80,
+    speed: 96,
     image: 'assets/plankton.png',
     color: '#1d713c',
     behavior: 'fast and weak',
@@ -82,7 +82,7 @@ const creatureLibrary = {
     health: 70,
     maxHealth: 70,
     damage: 12,
-    speed: 60,
+    speed: 82,
     image: 'assets/platypus.png',
     color: '#1d99ce',
     behavior: 'kites from a distance',
@@ -96,7 +96,7 @@ const creatureLibrary = {
     health: 240,
     maxHealth: 240,
     damage: 35,
-    speed: 50,
+    speed: 68,
     image: 'assets/dragon.png',
     color: '#fc0000',
     behavior: 'boss wave enemy',
@@ -110,7 +110,7 @@ const creatureLibrary = {
     health: 180,
     maxHealth: 180,
     damage: 28,
-    speed: 70,
+    speed: 94,
     image: 'assets/two-headed-leopard-wings.png',
     color: '#d6ec0c',
     behavior: 'flying predator',
@@ -124,7 +124,7 @@ const creatureLibrary = {
     health: 320,
     maxHealth: 320,
     damage: 50,
-    speed: 35,
+    speed: 72,
     image: 'assets/eldritch-being.png',
     color: '#f40a83',
     behavior: 'final boss',
@@ -140,6 +140,8 @@ function randomRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+// This function decides which enemy type should appear in a given wave.
+// It keeps the design readable and easy to expand later.
 function getEnemyTypeForWave(waveNumber) {
   const safeWave = Math.max(1, waveNumber);
 
@@ -151,26 +153,32 @@ function getEnemyTypeForWave(waveNumber) {
     return 'dragon';
   }
 
-  const pool = ['plankton', 'plankton', 'platypus', 'rhino'];
+  const pool = ['plankton', 'plankton', 'platypus', 'rhino', 'twoHeadedLeopardWithWings'];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function placeAroundPlayer(enemy, minDistance = 500, maxDistance = 900) {
-  const angle = Math.random() * Math.PI * 2;
-  const radius = randomRange(minDistance, maxDistance);
+// The boss rule is kept separate so the game can clearly say:
+// every 5th wave is a boss, and wave 10 is the Eldritch Being.
+function getBossTypeForWave(waveNumber) {
+  if (waveNumber === 10) {
+    return 'eldritchBeing';
+  }
 
-  enemy.x = player.x + Math.cos(angle) * radius;
-  enemy.y = player.y + Math.sin(angle) * radius;
+  return 'dragon';
 }
 
-function createEnemyFromType(typeName, isBoss = false) {
+// This is a clean factory pattern:
+// take a creature definition from the library, then turn it into a live enemy object.
+function createEnemyFromType(typeName, isBoss = false, waveNumber = waveState.current) {
   const template = creatureLibrary[typeName];
+  const waveSpeedBonus = 1 + (waveNumber - 1) * 0.12;
+  const bossBoost = isBoss ? 1.35 : 1;
 
   const enemy = {
     x: 0,
     y: 0,
-    radius: isBoss ? 28 : 12 + Math.random() * 8,
-    speed: template.speed + randomRange(-12, 16),
+    radius: isBoss ? 30 : 12 + Math.random() * 8,
+    speed: (template.speed + randomRange(-12, 18)) * waveSpeedBonus * bossBoost,
     health: template.health,
     maxHealth: template.health,
     damage: template.damage,
@@ -180,7 +188,12 @@ function createEnemyFromType(typeName, isBoss = false) {
     boss: isBoss,
   };
 
-  placeAroundPlayer(enemy, isBoss ? 650 : 420, isBoss ? 1100 : 780);
+  // Put the enemy somewhere just outside the playable area around the player.
+  const angle = Math.random() * Math.PI * 2;
+  const distance = randomRange(isBoss ? 650 : 420, isBoss ? 1100 : 780);
+  enemy.x = player.x + Math.cos(angle) * distance;
+  enemy.y = player.y + Math.sin(angle) * distance;
+
   return enemy;
 }
 
@@ -195,24 +208,25 @@ function beginNextWave() {
   const isFinalBossWave = waveState.current === 10;
 
   if (isFinalBossWave) {
-    enemies.push(createEnemyFromType('eldritchBeing', true));
+    enemies.push(createEnemyFromType('eldritchBeing', true, waveState.current));
     for (let i = 0; i < 4; i++) {
-      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false, waveState.current));
     }
     return;
   }
 
   if (bossWave) {
-    enemies.push(createEnemyFromType('dragon', true));
+    const bossType = getBossTypeForWave(waveState.current);
+    enemies.push(createEnemyFromType(bossType, true, waveState.current));
     for (let i = 0; i < 3; i++) {
-      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+      enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false, waveState.current));
     }
     return;
   }
 
   const spawnCount = 6 + waveState.current * 2;
   for (let i = 0; i < spawnCount; i++) {
-    enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false));
+    enemies.push(createEnemyFromType(getEnemyTypeForWave(waveState.current), false, waveState.current));
   }
 }
 
