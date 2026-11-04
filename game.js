@@ -34,6 +34,99 @@ const enemies = [];
 const drops = [];
 const particles = [];
 
+// Creature data is stored as JavaScript objects.
+// Each object is a blueprint for a monster or boss.
+// Later, you can use these values to spawn enemies or draw sprite images.
+const creatureLibrary = {
+  rhino: {
+    name: 'Rhino',
+    category: 'brute',
+    size: 'large', // placeholder: replace with actual scale or hitbox size
+    health: 120, // placeholder: set full health later
+    maxHealth: 120,
+    damage: 20, // placeholder: attack damage value
+    speed: 45, // placeholder: movement speed
+    image: 'assets/rhino.png', // placeholder: file path for the art asset
+    color: '#6109e58c', // placeholder: temporary colour for testing
+    behavior: 'charges toward the player',
+    notes: 'Use this as a tanky melee enemy placeholder.'
+  },
+
+  plankton: {
+    name: 'Plankton',
+    category: 'swarm',
+    size: 'small',
+    health: 30,
+    maxHealth: 30,
+    damage: 8,
+    speed: 80,
+    image: 'assets/plankton.png',
+    color: '#1d713c',
+    behavior: 'fast, weak, and annoying',
+    notes: 'A light horde unit for early-game pressure.'
+  },
+
+  platypus: {
+    name: 'Platypus',
+    category: 'ranged',
+    size: 'medium',
+    health: 70,
+    maxHealth: 70,
+    damage: 12,
+    speed: 60,
+    image: 'assets/platypus.png',
+    color: '#1d99ce',
+    behavior: 'shoots or throws attacks from a distance',
+    notes: 'Good example of a ranged enemy blueprint.'
+  },
+
+  dragon: {
+    name: 'Dragon',
+    category: 'boss',
+    size: 'huge',
+    health: 240,
+    maxHealth: 240,
+    damage: 35,
+    speed: 50,
+    image: 'assets/dragon.png',
+    color: '#fc0000',
+    behavior: 'flies, breathes fire, and hits hard',
+    notes: 'This is the large boss-type placeholder.'
+  },
+
+  twoHeadedLeopardWithWings: {
+    name: 'Two-Headed Leopard with Wings',
+    category: 'elite',
+    size: 'large',
+    health: 180,
+    maxHealth: 180,
+    damage: 28,
+    speed: 70,
+    image: 'assets/two-headed-leopard-wings.png',
+    color: '#d6ec0c',
+    behavior: 'multi-attack aerial predator',
+    notes: 'A more complex creature with two heads and wings.'
+  },
+
+  eldritchBeing: {
+    name: 'Eldritch Being',
+    category: 'cosmic',
+    size: 'giant',
+    health: 320,
+    maxHealth: 320,
+    damage: 50,
+    speed: 35,
+    image: 'assets/eldritch-being.png',
+    color: '#f40a83',
+    behavior: 'teleports, pulses, and corrupts the arena',
+    notes: 'Boss placeholder for a weird magical final enemy.'
+  }
+};
+
+// This makes the object library easier to inspect in the console.
+// You can type: console.log(creatureLibrary)
+// in the browser dev tools to see all the placeholder data.
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
